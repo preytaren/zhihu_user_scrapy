@@ -6,10 +6,10 @@ from PIL import Image
 from celery import Celery
 
 
-app = Celery('cele', broker='redis://localhost:6379')
+app = Celery('tasks', broker='redis://localhost:6379')
 
 
-@app.task
+@app.task(name='zhihu_user_scrapy.tasks.download')
 def download(url, path='images'):
     res = requests.get(url)
     filename = url[url.rfind('/')+1:]
