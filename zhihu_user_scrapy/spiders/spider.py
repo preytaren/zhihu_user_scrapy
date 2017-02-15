@@ -13,6 +13,8 @@ class ZhihuSpider(Spider):
     allowed_domain = ['www.zhihu.com']
     start_urls = ['https://www.zhihu.com/people/excited-vczh']
     NUMBER_PATTERN = re.compile('[0-9]+')
+    THANKS_PATTERN = re.compile(ur'获得 ([0-9]+) 次感谢', re.U)
+    COLLECTION_PATTERN = re.compile(ur'([0-9]+) 次收藏', re.U)
 
     def parse(self, response):
         yield self.parse_item(response)
@@ -28,15 +30,30 @@ class ZhihuSpider(Spider):
         item = ZhihuUserScrapyItem()
         item['url'] = response.url
         item['name'] = response.xpath("//span[@class='ProfileHeader-name']/text()").extract()[0]
-        item['approve'] = response.xpath("//div[@class='IconGraf']/text()").extract()[0].split(' ')[1]
-        item['thanks'], item['collections'] = self.NUMBER_PATTERN.findall(''.join(response.xpath("//div[@class='Profile-sideColumnItemValue']/text()").extract()))
-        item['following'], item['follower'] = response.xpath("//div[@class='NumberBoard-value']/text()").extract()
-        item['anwsers'] = response.xpath("//a[@href='/people/{}/answers']/span/text()".format(response.url.split('/')[-1])).extract()[0]
+        item['img'] = response.xpath("//img[@class='Avatar Avatar--large UserAvatar-inner']/@src").extract()[0]
+        item['approve'] = self.check_exist(
+            lambda: int(response.xpath("//div[@class='IconGraf']/text()").extract()[0].split(' ')[1])
+        )
+        item['thanks'] = self.check_exist(
+            lambda: self.THANKS_PATTERN.findall(response.xpath("//div[@class='Profile-sideColumnItemValue']/text()").extract()[0])[0]
+        )
+        item['collections'] = self.check_exist(
+            lambda: self.COLLECTION_PATTERN.findall(response.xpath("//div[@class='Profile-sideColumnItemValue']/text()").extract()[0])[0]
+        )
+        item['following'], item['follower'] = map(int, response.xpath("//div[@class='NumberBoard-value']/text()").extract())
+        item['answers'] = int(response.xpath("//a[@href='/people/{}/answers']/span/text()".format(response.url.split('/')[-1])).extract()[0])
         return item
 
+    def check_exist(self, function, default=0):
+        try:
+
+            result = function()
+            return result
+        except Exception as e:
+            self.log(e)
+            return default
 
     def parse_following_link(self, response):
-        self.log('--- Parse following-link {} ---'.format(response.url))
         content = json.loads(response.text)
         for url_token in self._parse_url_token(content['data']):
             yield Request(url='https://www.zhihu.com/people/{}'.format(url_token),
