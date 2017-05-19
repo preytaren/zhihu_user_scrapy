@@ -1,0 +1,4 @@
+Scrapy==1.2.1
+celery==4.0.2
+SQLAlchemy==1.1.4
+Pillow==3.2.0
